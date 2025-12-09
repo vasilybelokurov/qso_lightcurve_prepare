@@ -578,29 +578,81 @@ Accept baseline performance of **0.5-1.0 src/s** with 8 threads, resulting in **
   - Output: `ztf_loo_results_g.fits`, `gaia_ztf_qso_sample_ztf_lc_g_clean_loo.fits`
   - Mean removed: 1.2 epochs, max: 3
 
-**Production Run (RUNNING):**
+**Production Run (COMPLETED):**
 - Started: 2025-12-09 12:56pm
+- Completed: 2025-12-09 ~19:00 (est)
 - Mode: Parallel processing of both bands simultaneously
-- Configuration:
-  - g-band: PID 73231, 8 workers, log: `~/data/qso/qso_lightcurve_prepare/loo_cleaning_g.log`
-  - r-band: PID 73263, 8 workers, log: `~/data/qso/qso_lightcurve_prepare/loo_cleaning_r.log`
-  - Total RAM: ~2.3 GB (1.2 GB + 1.1 GB)
-  - Expected runtime: ~4-5 hours per band
+- Configuration: 8 workers per band, ~2.3 GB RAM total
+- Runtime: ~6 hours
 
-**Output files (expected):**
-- `data/ztf_loo_results_g.fits` - LOO statistics for g-band
-- `data/ztf_loo_results_r.fits` - LOO statistics for r-band
-- `data/gaia_ztf_qso_sample_ztf_lc_g_clean_loo.fits` - Cleaned g-band lightcurves
-- `data/gaia_ztf_qso_sample_ztf_lc_r_clean_loo.fits` - Cleaned r-band lightcurves
+**ZTF Results:**
+- **g-band:**
+  - Successful: 8,371/8,529 sources (98.1%)
+  - Mean removed: 0.62 epochs/source
+  - Total removed: 5,178 epochs
+  - No removal: 4,985/8,371 sources (59.6%)
+  - Output: `data/ztf_loo_results_g.fits` (0.7 MB), `data/gaia_ztf_qso_sample_ztf_lc_g_clean_loo.fits` (87.9 MB)
+- **r-band:**
+  - Successful: 8,449/8,529 sources (99.1%)
+  - Mean removed: 0.32 epochs/source
+  - Total removed: 2,745 epochs
+  - No removal: 6,450/8,449 sources (76.3%)
+  - Output: `data/ztf_loo_results_r.fits` (0.7 MB), `data/gaia_ztf_qso_sample_ztf_lc_r_clean_loo.fits` (116.5 MB)
 
-**Key Features:**
-- Single-band processing: Memory-efficient, can run in parallel
-- Automatic output naming: `*_{band}.fits` pattern
-- Periodic logging: Every 100 sources with `flush=True`
-- Parallel execution: Both bands running simultaneously on separate cores
-- Resumable: Each band independent, can restart individually if needed
+**All failures: 0** (full-fit, LOO, post-fit)
 
-**Status:** Production run in progress (both bands running in parallel)
+**Status:** ✓ COMPLETE - ZTF LOO cleaning successful
+
+---
+
+### Gaia LOO Outlier Cleaning
+**Script:** `apply_loo_cleaning_gaia.py`
+
+**Objective:** Apply Leave-One-Out (LOO) outlier detection to Gaia lightcurves (G/BP/RP bands)
+
+**Implementation:**
+- Based on qso_gp_mock/ztf_10k_lightcurve_quality.ipynb (cell 14)
+- Same DRW/OU GP fitting approach as ZTF
+- Gaia-specific: flux→mag error conversion using K_MAG = 2.5/ln(10)
+- Column mapping for G/BP/RP bands
+- Single-band mode with parallel processing
+
+**Production Run (COMPLETED):**
+- Started: 2025-12-09 14:09pm
+- Completed: 2025-12-09 ~19:00 (est)
+- Mode: 3 bands processed in parallel
+- Configuration: 8 workers per band, ~1.7 GB RAM total
+- Runtime: ~5 hours
+
+**Gaia Results:**
+- **G-band:**
+  - Successful: 8,529/8,529 sources (100%)
+  - Mean removed: 0.12 epochs/source
+  - Total removed: 1,048 epochs
+  - No removal: 7,647/8,529 sources (89.7%)
+  - Output: `data/gaia_loo_results_g.fits` (0.7 MB), `data/gaia_ztf_qso_sample_gaia_lc_g_clean_loo.fits` (28.7 MB)
+- **BP-band:**
+  - Successful: 8,488/8,529 sources (99.5%)
+  - Mean removed: 1.50 epochs/source
+  - Total removed: 12,718 epochs
+  - No removal: 1,824/8,488 sources (21.5%)
+  - Output: `data/gaia_loo_results_bp.fits` (0.7 MB), `data/gaia_ztf_qso_sample_gaia_lc_bp_clean_loo.fits` (28.3 MB)
+- **RP-band:**
+  - Successful: 8,502/8,529 sources (99.7%)
+  - Mean removed: 1.76 epochs/source
+  - Total removed: 14,922 epochs
+  - No removal: 1,417/8,502 sources (16.7%)
+  - Output: `data/gaia_loo_results_rp.fits` (0.7 MB), `data/gaia_ztf_qso_sample_gaia_lc_rp_clean_loo.fits` (28.3 MB)
+
+**All failures: 0** (full-fit, LOO, post-fit)
+
+**Key Observations:**
+- Gaia G-band very clean (89.7% no removal) - expected for space-based photometry
+- Gaia BP/RP bands had significantly more outliers than G-band
+- BP/RP median removal: 1-2 epochs vs G median: 0 epochs
+- Total epochs removed across all 5 bands: 36,611
+
+**Status:** ✓ COMPLETE - All LOO cleaning successful (ZTF g/r + Gaia G/BP/RP)
 
 ---
 
