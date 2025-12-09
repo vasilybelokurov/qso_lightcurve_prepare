@@ -20,12 +20,10 @@ This pipeline creates two FITS files:
 ### Step 1: Download Cross-Match Catalog
 
 ```bash
-source ~/Work/venvs/.venv/bin/activate
-cd ~/Work/Code/qso_lightcurve_prepare
 python download_sdssdr16q_gaia_source.py
 ```
 
-**Output:** `~/data/gaia/sdssdr16q_gaia_source.fits`
+**Output:** Default location (configure in script)
 
 **What it does:**
 - Spatially cross-matches SDSS DR16Q final QSOs with Gaia DR3 sources (1 arcsec radius)
@@ -43,7 +41,7 @@ python download_sdssdr16q_gaia_source.py
 python download_sdssdr16q_gaia_epoch_photometry.py
 ```
 
-**Output:** `~/data/gaia/sdssdr16q_gaia_epoch_photometry.fits`
+**Output:** Default location (configure in script)
 
 **What it does:**
 - Loads source_ids from Step 1 catalog
@@ -55,15 +53,12 @@ python download_sdssdr16q_gaia_epoch_photometry.py
 
 ## Output Files
 
-```
-~/data/gaia/
-├── sdssdr16q_gaia_source.fits           (~400 MB, ~469k rows, ~350 columns)
-└── sdssdr16q_gaia_epoch_photometry.fits (~3 GB, ~100M photometry points)
-```
+- Cross-match catalog: ~400 MB, ~469k rows, ~350 columns
+- Epoch photometry: ~3 GB, ~100M photometry points
 
 ## Notes
 
 - Step 1 must complete before running Step 2
-- Both files saved to `~/data/gaia/` (created automatically if needed)
+- Output locations can be configured in each script
 - Conflicting column names are prefixed to avoid collisions
 - Uses proven `local_join` pattern from Quaia lightcurve downloads
