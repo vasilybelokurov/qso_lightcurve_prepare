@@ -55,7 +55,11 @@ def prepare_ztf_lightcurve(ztf_row, z, band='g', min_points=MIN_POINTS):
     Returns
     -------
     dict or None
-        Dictionary with 'times_rest', 'mags', 'mag_errs' or None if unusable
+        Dictionary with 'times_rest', 'mags', 'mag_errs', 'orig_to_sorted',
+        'sorted_to_orig' mappings, or None if unusable
+
+        'orig_to_sorted': Maps original FITS array indices to sorted array indices
+        'sorted_to_orig': Maps sorted array indices back to original FITS indices
     """
     band = band.lower()
 
@@ -70,12 +74,18 @@ def prepare_ztf_lightcurve(ztf_row, z, band='g', min_points=MIN_POINTS):
     except (KeyError, ValueError):
         return None
 
+    # Store original array length
+    N_original = len(times)
+
     # Filter invalid values
     mask = ~(np.isnan(times) | np.isnan(mags) | np.isnan(mag_errs))
     mask &= (mag_errs > 0)
 
     if mask.sum() < min_points:
         return None
+
+    # CRITICAL FIX: Track which original indices survived the NaN filter
+    orig_indices_after_mask = np.where(mask)[0]
 
     times = times[mask]
     mags = mags[mask]
@@ -87,13 +97,18 @@ def prepare_ztf_lightcurve(ztf_row, z, band='g', min_points=MIN_POINTS):
     mags = mags[sort_idx]
     mag_errs = mag_errs[sort_idx]
 
+    # CRITICAL FIX: Map sorted indices back to original FITS array indices
+    # sorted_to_orig[i] = original FITS index of the i-th epoch in sorted array
+    sorted_to_orig = orig_indices_after_mask[sort_idx]
+
     # Convert to rest-frame time
     times_rest = times / (1.0 + z)
 
     return {
         'times_rest': times_rest,
         'mags': mags,
-        'mag_errs': mag_errs
+        'mag_errs': mag_errs,
+        'sorted_to_orig': sorted_to_orig,  # NEW: mapping for index correction
     }
 
 
@@ -120,6 +135,7 @@ def _ztf_loo_process_one(i, ztf_table, catalog_table, band, min_points, max_pass
     times_rest = np.asarray(lc["times_rest"], dtype=float)
     mags = np.asarray(lc["mags"], dtype=float)
     mag_errs = np.asarray(lc["mag_errs"], dtype=float)
+    sorted_to_orig = lc["sorted_to_orig"]  # NEW: mapping to original FITS indices
 
     if len(times_rest) < min_points:
         return None
@@ -129,7 +145,8 @@ def _ztf_loo_process_one(i, ztf_table, catalog_table, band, min_points, max_pass
     times_cur = times_rest.copy()
     mags_cur = mags_centered.copy()
     errs_cur = mag_errs.copy()
-    orig_indices = np.arange(len(times_rest), dtype=int)
+    # CRITICAL FIX: Track indices in sorted array (for LOO analysis)
+    sorted_indices = np.arange(len(times_rest), dtype=int)
 
     first_full_fit = None
     last_post_fit = None
@@ -206,12 +223,15 @@ def _ztf_loo_process_one(i, ztf_table, catalog_table, band, min_points, max_pass
             last_post_fit = None
             break
 
-        removed_orig.append(int(orig_indices[idx_max_D_cur]))
+        # CRITICAL FIX: Map from sorted array index to original FITS index
+        sorted_idx_to_remove = sorted_indices[idx_max_D_cur]
+        orig_idx_to_remove = sorted_to_orig[sorted_idx_to_remove]
+        removed_orig.append(int(orig_idx_to_remove))
 
         times_cur = times_cur[mask_keep]
         mags_cur = mags_cur[mask_keep]
         errs_cur = errs_cur[mask_keep]
-        orig_indices = orig_indices[mask_keep]
+        sorted_indices = sorted_indices[mask_keep]
 
         last_post_fit = post_fit
         n_removed += 1
@@ -338,8 +358,10 @@ def create_loo_cleaned_lightcurves(ztf_table, removed_dict_g, removed_dict_r, ba
         Original ZTF lightcurve table
     removed_dict_g : dict
         Dictionary mapping source_id -> removed indices for g-band
+        CRITICAL: These indices refer to positions in the ORIGINAL FITS arrays
     removed_dict_r : dict
         Dictionary mapping source_id -> removed indices for r-band
+        CRITICAL: These indices refer to positions in the ORIGINAL FITS arrays
     bands : list
         Bands to process
 
@@ -347,6 +369,12 @@ def create_loo_cleaned_lightcurves(ztf_table, removed_dict_g, removed_dict_r, ba
     -------
     astropy.table.Table
         Cleaned ZTF table with outliers removed
+
+    Notes
+    -----
+    After bug fix (2025-12-10): removed_dict now contains indices that correctly
+    map to the original FITS array positions, accounting for both NaN filtering
+    and time sorting performed during LOO analysis.
     """
     print("\nCreating LOO-cleaned lightcurve table...")
 

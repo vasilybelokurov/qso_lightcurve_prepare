@@ -677,3 +677,210 @@ Accept baseline performance of **0.5-1.0 src/s** with 8 threads, resulting in **
 9. D vs L_bol analysis using matched redshifts and multi-band data
 
 ---
+
+---
+
+## 2025-12-11: Creating Matched ZTF+Gaia Dataset for Analysis
+
+### Objective
+Create analysis-ready datasets linking ZTF and Gaia lightcurves for SDSS QSOs, with full SDSS+Gaia source properties.
+
+### Background Context
+- ZTF primary HDF5 files exist: 706,985 g-band + 722,701 r-band sources (total 731,702 unique)
+- Full Gaia epoch photometry: 223,221 sources with G/BP/RP lightcurves
+- Full SDSS×Gaia source catalog: 489,484 sources with all 336 columns
+- Need: Matched datasets for sources with BOTH ZTF and Gaia lightcurves
+
+### Step 1: Extract Gaia Lightcurves for ZTF Sources
+
+**Script:** `extract_gaia_for_ztf_sources.py`
+
+**Approach:**
+1. Load ZTF primary source list (731,702 unique sdss_names)
+2. Match with full Gaia source catalog → get source_ids
+3. Filter full Gaia epoch photometry by matched source_ids
+4. Write matched Gaia lightcurves with sdss_name added
+
+**Results:**
+- Matched with Gaia source catalog: 482,010 sources (65.9% of ZTF)
+- With Gaia epoch photometry: 219,778 sources (30.0% of ZTF, 45.6% of Gaia matches)
+- **Output:** `data/gaia_g_for_ztf_primary.fits` (974 MB)
+  - Columns: sdss_name, source_id, ra, dec, z, g/bp/rp transit times/mags/fluxes, flags
+  - RAW epoch photometry (not LOO-cleaned)
+
+**Key insight:** Only ~30% of ZTF primary sources have Gaia epoch photometry (vs 65.9% with Gaia source matches)
+
+### Step 2: Extract ZTF Lightcurves for Gaia Sources
+
+**Script:** `extract_ztf_for_gaia_sources.py`
+
+**Approach:**
+1. Load Gaia lightcurves file → get sdss_name list (219,778 sources)
+2. Extract matching lightcurves from ZTF primary HDF5 files
+3. Write separate FITS files for g and r bands
+
+**Results:**
+- **ZTF g-band:** 217,615 sources → `data/ztf_g_for_gaia_primary.fits` (1.7 GB)
+  - Total epochs: 91.8M (median 358 epochs/source)
+  - Already filtered: deduplicated + catflags=0
+  
+- **ZTF r-band:** 218,742 sources → `data/ztf_r_for_gaia_primary.fits` (2.3 GB)
+  - Total epochs: 121.3M (median 534 epochs/source)
+  - Already filtered: deduplicated + catflags=0
+
+**Coverage:**
+- Sources with Gaia+ZTF g-band: 217,615 (99.0% of Gaia sample)
+- Sources with Gaia+ZTF r-band: 218,742 (99.5% of Gaia sample)
+- Sources with Gaia+both ZTF bands: ~217k (estimated)
+
+### Step 3: Extract SDSS+Gaia Catalogs
+
+**Objective:** Provide full source properties (all 336 columns from SDSS DR16Q + Gaia DR3)
+
+**Two catalogs created:**
+
+#### 3a. Catalog for ALL ZTF Primary Sources
+**File:** `data/sdss_gaia_catalog_for_ztf_primary.fits` (2.1 GB, 482,161 sources)
+- Contains: All sources from ZTF primary files that have Gaia source matches
+- Use case: Analysis requiring full ZTF sample (including sources without Gaia lightcurves)
+
+#### 3b. Catalog for ZTF+Gaia Matched Lightcurves
+**File:** `data/sdss_gaia_catalog_for_ztf_gaia_lc.fits` (970 MB, 219,830 sources)
+- Contains: Only sources with BOTH ZTF and Gaia epoch photometry
+- Use case: **Primary analysis-ready dataset** for variability studies
+
+**Columns (336 total):**
+- SDSS properties: z, magnitudes (ugriz), classification flags, BAL, WISE, GALEX
+- Gaia properties: parallax, proper motions, photometry, variability flags
+- Conflicting columns prefixed: sdss_ra/dec, gaia_ra/dec, sdss_duplicated_source, gaia_duplicated_source
+
+### Final Matched Dataset Summary
+
+**Analysis-ready files in `data/` directory:**
+
+| File | Size | N Sources | Description |
+|------|------|-----------|-------------|
+| `sdss_gaia_catalog_for_ztf_gaia_lc.fits` | 970 MB | 219,830 | Full SDSS+Gaia properties (336 cols) |
+| `gaia_g_for_ztf_primary.fits` | 974 MB | 219,778 | Gaia G/BP/RP epoch photometry (RAW) |
+| `ztf_g_for_gaia_primary.fits` | 1.7 GB | 217,615 | ZTF g-band (deduplicated + catflags=0) |
+| `ztf_r_for_gaia_primary.fits` | 2.3 GB | 218,742 | ZTF r-band (deduplicated + catflags=0) |
+| **Total** | **5.9 GB** | **~220k** | **5 bands: ZTF g/r + Gaia G/BP/RP** |
+
+**Common identifier:** `sdss_name` (format: HHMMSS.ss+DDMMSS.s)
+
+**Data quality:**
+- ZTF lightcurves: Primary objectid selected (max epochs), catflags=0 applied
+- Gaia lightcurves: RAW (LOO cleaning not yet applied to this subset)
+- Completeness: 99.0% have g-band, 99.5% have r-band, 100% have Gaia G/BP/RP
+
+### Scripts Created
+
+1. `extract_gaia_for_ztf_sources.py` - Extract Gaia lightcurves for ZTF sources
+2. `extract_ztf_for_gaia_sources.py` - Extract ZTF lightcurves for Gaia sources
+3. Catalog extraction: inline Python scripts (not saved as .py files)
+
+### Documentation Updates
+
+**README.md:**
+- Updated data files summary table with matched datasets
+- Added "Matched ZTF+Gaia Dataset (220k sources)" section with usage examples
+- Added "All ZTF Primary Sources (482k sources)" section
+- Clear hierarchy: Full datasets → Matched datasets → Working subset
+
+**Next Steps:**
+- Apply LOO cleaning to Gaia lightcurves in matched dataset (currently RAW)
+- Create combined analysis notebooks using matched datasets
+- Consider HDF5 conversion for faster loading
+
+---
+
+## Session 3: 2025-12-11
+
+### Gaia Time Format Clarification and Visualization
+
+**Issue:** Gaia epoch photometry times were initially misunderstood, causing incorrect time alignment in plots.
+
+**Investigation:**
+- Initial assumption: Gaia times stored as "days since J2016.0" (MJD 57388.5)
+- **Correct format** per [Gaia DR3 documentation](https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_photometry/ssec_dm_epoch_photometry.html):
+  - `g_transit_time`, `bp_obs_time`, `rp_obs_time` are in **JD(TCB) - 2455197.5** days
+  - Reference epoch: JD 2455197.5 (TCB) = **2010-01-01T00:00:00**
+  - **Conversion to MJD:** `MJD = g_transit_time + 55197`
+    - (Since MJD = JD - 2400000.5, so MJD = (g_transit_time + 2455197.5) - 2400000.5 = g_transit_time + 55197)
+
+**Verification:**
+- Raw Gaia time value: 1695.4 days
+- Incorrect conversion (days since J2016.0): MJD 59084 → Aug 2020
+- **Correct conversion (JD-2455197.5):** MJD 56892 → Aug 2014 (Gaia main mission)
+
+**Impact:**
+- Previous conversion was offset by ~2191 days (6 years)
+- This caused Gaia lightcurves to appear in wrong epoch on plots
+- Corrected conversion now properly aligns Gaia observations with ZTF timeframe
+
+**Script Updates:**
+- `plot_top10_lightcurves.py`: Updated Gaia time conversion from `+57388.5` to `+55197`
+- Added command-line argument support to plot top N lightcurves (default 10)
+- Generated 100 example plots for verification
+
+**Documentation Updates:**
+- **README.md:** Added "Time formats" section documenting Gaia time conversion formula
+- Included reference to official Gaia DR3 documentation
+- Clarified that ZTF uses standard MJD (UTC)
+
+**Key Learning:**
+- Always verify time format assumptions against official documentation
+- Gaia uses custom epoch (2010-01-01) not J2016.0
+- TCB (Barycentric Coordinate Time) correction is already applied in stored values
+
+**Files Modified:**
+1. `plot_top10_lightcurves.py` - Fixed Gaia MJD conversion
+2. `README.md` - Added time format documentation
+3. `JOURNAL.md` - This entry
+
+**Verification:**
+- Generated 100 lightcurve plots showing proper time alignment
+- Gaia G magnitudes (~18.3-18.5) correctly offset from ZTF r (~17.8) by ~0.5 mag
+- Actual data coverage verified:
+  - **Gaia DR3:** 2014-07-25 to 2017-05-28 (34 months) [Gaia SSDC, Eyer et al. 2023]
+  - **ZTF DR19:** 2018-03-20 to 2024-10-30 (6.6 years) [ZTF Public Releases, IRSA]
+  - **No temporal overlap** between Gaia DR3 and ZTF DR19 epochs
+
+**References:**
+- Gaia DR3 time coverage: [Gaia SSDC](https://gaia.ssdc.asi.it/news.php), [Eyer et al. 2023, A&A](https://www.aanda.org/articles/aa/full_html/2023/06/aa44242-22/aa44242-22.html)
+- ZTF time coverage: [ZTF Public Data Releases](https://www.ztf.caltech.edu/ztf-public-releases.html), [IRSA ZTF](https://irsa.ipac.caltech.edu/Missions/ztf.html)
+- ZTF first light: November 1, 2017; science operations: February 2018
+- Gaia DR3 epoch photometry documentation: [ESA Gaia Archive](https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_photometry/ssec_dm_epoch_photometry.html)
+
+---
+
+## Session 4: 2025-12-19
+
+### Add Wushen VAC 2024 Columns to 220k Matched Catalog
+
+**Objective:** Create an augmented version of the matched SDSS+Gaia catalog (`~220k` sources) by joining in additional SDSS DR16Q VAC columns from `sdssdr16qso.wushen_vac_2024` via WSDB.
+
+**Input:**
+- `data/sdss_gaia_catalog_for_ztf_gaia_lc.fits` (219,830 sources, 336 cols)
+
+**Approach:**
+- Join key: `sdss_name`
+- WSDB access via `sqlutilpy.local_join()` with an uploaded index column (`idx`) to preserve the original FITS row order
+- VAC columns written with `wushen_*` prefix for provenance and to avoid collisions
+
+**Script:** `add_wushen_vac_2024_to_catalog.py`
+
+**Command:**
+```bash
+source ~/Work/venvs/.venv/bin/activate
+python add_wushen_vac_2024_to_catalog.py \
+  --input data/sdss_gaia_catalog_for_ztf_gaia_lc.fits \
+  --output data/sdss_gaia_catalog_for_ztf_gaia_lc_with_wushen_vac_2024.fits \
+  --input-key sdss_name --vac-key sdss_name --prefix-all
+```
+
+**Result:**
+- Output: `data/sdss_gaia_catalog_for_ztf_gaia_lc_with_wushen_vac_2024.fits`
+- Rows: 219,830 (same as input)
+- Columns: 450 (added 114 VAC columns)
+- Size: ~1.8 GB

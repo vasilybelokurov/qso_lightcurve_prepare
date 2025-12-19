@@ -36,3 +36,7 @@ Thumbs.db
 
 # Manifest files
 manifest*.txt
+
+# Generated plots
+plots*/
+plots_*/
