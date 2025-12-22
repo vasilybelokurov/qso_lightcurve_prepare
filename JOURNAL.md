@@ -884,3 +884,47 @@ python add_wushen_vac_2024_to_catalog.py \
 - Rows: 219,830 (same as input)
 - Columns: 450 (added 114 VAC columns)
 - Size: ~1.8 GB
+
+---
+
+## Session 5: 2025-12-19
+
+### Add Read-Only Mode for Precomputed LOO Results (Notebook)
+
+**Objective:** Enable `ztf_g_loo_logD_vs_wushen_loglbol.ipynb` to skip catalog selection + LOO fitting and directly load saved LOO results for plotting/analysis.
+
+**Changes:**
+- Added new user parameters to the notebook:
+  - `READ_RESULTS` (bool): gate to skip heavy processing.
+  - `RESULTS_TAG`: filename tag for `loo_results_*.fits` (same naming scheme as write step).
+  - `RESULTS_FITS_OVERRIDE`: full path to a results FITS (bypasses tag).
+  - `SELECTION_FITS_OVERRIDE`: optional full path to a selection FITS.
+  - `SN_THRESHOLD_TUNED`: set explicitly when loading precomputed results (used in tag/title).
+- Inserted a dedicated “load results” cell that:
+  - Builds the expected tag if not overridden.
+  - Reads `loo_results_<TAG>.fits` into `results_table`.
+  - Optionally reads `selection_<TAG>.fits` for metadata if present.
+- Wrapped the expensive processing cells (catalog load, join, S/N selection, LOO run) with:
+  - `if READ_RESULTS: ... else: ...` guards
+  - Simple status prints when skipping
+
+**Usage Notes:**
+- Set `READ_RESULTS = True` to bypass selection + LOO.
+- Provide either `RESULTS_TAG` or `RESULTS_FITS_OVERRIDE`.
+- Set `SN_THRESHOLD_TUNED` to match the saved run (for accurate tag/title).
+- All downstream plots/statistics operate on `results_table` loaded from disk.
+
+**Follow-up Fix:**
+- Plot title in the D–L scatter cell now handles `SN_THRESHOLD_TUNED=None` safely by computing a fallback string from `SN_THRESHOLD` (or “?” if both are missing), preventing `TypeError` during formatting in read-only mode.
+
+**Further Notebook Enhancements (LOO residual driver scans):**
+- Added a comprehensive driver-correlation cell that loads Wushen scalar + line-array properties, computes correlations against precomputed residuals, and plots each driver vs residuals with binned medians and robust SE.
+- Added percentile trimming (default P2–P98) and non-positive x-value exclusion to stabilize correlations.
+- Added EW cap (`EW <= 200`) for all equivalent-width drivers.
+- Hardened binning against degenerate edges and small sample sizes to avoid `ValueError` from `binned_statistic`.
+- Fixed formatting bugs in plot titles and summary print statements.
+- Added automatic PNG export of each driver plot to `plots/` (saved as `residuals_<driver>.png`).
+
+**Model Comparison Additions:**
+- Added robust two-model comparison cell for `logD ~ logLbol` vs `logD ~ logLbol + EBV + logEW(CIII)`, including residual distributions.
+- Added follow-up diagnostics cell computing delta-variance reduction and 5-fold cross-validated RMSE for both models.
